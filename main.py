@@ -1,46 +1,33 @@
 import psycopg2
+import telebot
+import requests
 from config import host, user, password, db_name
+connection = psycopg2.connect(
+    host=host,
+    user=user,
+    password=password,
+    database=db_name
+)
+connection.autocommit = True
+cursor = connection.cursor()
 
-try:
-    # подключение к базе данных
-    connection = psycopg2.connect(
-        host=host,
-        user=user,
-        password=password,
-        database=db_name
-    )
-    connection.autocommit = True
+bot = telebot.TeleBot('5323448846:AAHhQHdJTTEH7uzNRhTjpt8vOYdhlv91KF0')
 
-    #методы для sql команл
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT version();"
-        )
+@bot.message_handler(commands=['start'])
+def start(message):
+    startMessage = f'Привет, <b><u>{message.from_user.first_name}</u></b>. Для того что бы посмотреть все свои задачи напиши /tasks. Если ты хочешь добавить свою задачу напиши /addtask.'
+    bot.send_message(message.chat.id, startMessage, parse_mode='html')
 
-        print(f'Server version: {cursor.fetchone()}')
-
-    #создание таблицы
-    #with connection.cursor() as cursor:
-    #   cursor.execute(
-    #       """CREATE TABLE users(
-    #       id serial PRIMARY KEY, first_name varchar(50) NOT NULL, nickname varchar(60) NOT NULL);"""
-    #   )
-
-    #   print("Table created successfully!")
-
-    #заливаем данные
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """INSERT INTO users(first_name, nickname) VALUES ('Zahar', 'mfkrg1');"""
-        )
-
-        print("Data was successfully inserted!")
+@bot.message_handler()
+def get_user_text(message):
+    if message.text == "/tasks":
+        postgreSQL_select_Query = "select * from tasks"
+        cursor.execute(postgreSQL_select_Query)
+        users_records = cursor.fetchall()
+        text = '\n\n'.join([', '.join(map(str, x)) for x in users_records])
+        bot.send_message(message.chat.id, (str(text)))
 
 
-except Exception as _ex:
-    print("Error while working with PostgreSQL!", _ex)
-finally:
-    if connection:
-        # закрываем соединение
-        connection.close()
-        print("PostgreSQL connection closed!")
+
+
+bot.polling(none_stop=True)
