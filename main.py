@@ -1,6 +1,6 @@
 import psycopg2
 import telebot
-from telegram import Update
+from telebot import types
 from config import host, user, password, db_name
 
 connection = psycopg2.connect(
@@ -20,7 +20,22 @@ bot = telebot.TeleBot('5323448846:AAHhQHdJTTEH7uzNRhTjpt8vOYdhlv91KF0')
 @bot.message_handler(commands=['start'])
 def start(message):
     startMessage = f'Привет, <b><u>{message.from_user.first_name}</u></b>. Для того что бы посмотреть все свои задачи напиши /tasks. Если ты хочешь добавить свою задачу напиши /addtask.'
-    bot.send_message(message.chat.id, startMessage, parse_mode='html')
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    button_tasks=types.KeyboardButton(text="/tasks")
+    button_register=types.KeyboardButton(text="/register")
+    button_addtask=types.KeyboardButton(text="/addtask")
+    button_complete=types.KeyboardButton(text="/complete")
+    button_delete=types.KeyboardButton(text="/deletetask")
+    keyboard.add(button_tasks, button_register, button_addtask, button_delete, button_complete)
+    bot.send_message(message.chat.id, startMessage, parse_mode='html', reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda call:True)
+def answer_start(call):
+    if call.data == 'tasks':
+        bot.send_message(call.message.chat.id, '/tasks')
+        get_user_text(call.message)
+    elif call.data == 'register':
+        registration()
 
 
 @bot.message_handler(commands=['register'])
@@ -80,8 +95,6 @@ def complete(message_comp):
         bot.send_message(message_comp.chat.id, "Статус вашей задачи был обновлен на '⌛'")
 
 
-
-
 @bot.message_handler(commands=['tasks'])
 def get_user_text(message):
     current_user_nickname = message.from_user.username
@@ -89,6 +102,8 @@ def get_user_text(message):
     users_records = cursor.fetchall()
     if len(users_records) != 0:
         text = '\n\n'.join(['       '.join(map(str, x)) for x in users_records])
+        text = text.replace("ГОТОВО","✅")
+        text = text.replace("В ПРОЦЕССЕ", "⌛")
         bot.send_message(message.chat.id, (str(text)))
     else:
         bot.send_message(message.chat.id, "У вас нет задач.")
