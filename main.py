@@ -1,6 +1,6 @@
 import psycopg2
 import telebot
-from telegram.ext import updater
+from telegram import Update
 from config import host, user, password, db_name
 
 connection = psycopg2.connect(
@@ -46,36 +46,39 @@ def registration(message):
 @bot.message_handler(commands=['addtask'])
 def add_task(message):
     bot.send_message(message.chat.id, "Хорошо, дай название новой задаче")
-    @bot.message_handler(content_types=["text"])
-    def adding(message1):
-        current_user_nickname = message.from_user.username
-        bot.send_message(message.chat.id, """Вы успешно создали новую задачу с названием: '<b><u>"""+message1.text+ "</u></b>'", parse_mode='html')
-        cursor.execute(f"INSERT INTO tasks(author, task_name, state) VALUES ('{current_user_nickname}','{message1.text}', 'В ПРОЦЕССЕ')")
+    bot.register_next_step_handler(message, adding)
+
+def adding(message):
+    current_user_nickname = message.from_user.username
+    bot.send_message(message.chat.id, """Вы успешно создали новую задачу с названием: '<b><u>"""+message.text+ "</u></b>'", parse_mode='html')
+    cursor.execute(f"INSERT INTO tasks(author, task_name, state) VALUES ('{current_user_nickname}','{message.text}', 'В ПРОЦЕССЕ')")
 
 
 @bot.message_handler(commands=['deletetask'])
 def delete_task(message):
-    bot.send_message(message.chat.id, "Выбери задачу под удаление")
-    @bot.message_handler(content_types=["text"])
-    def delite_func(message_delete):
-        current_user_nickname = message_delete.from_user.username
-        cursor.execute(f"DELETE FROM tasks WHERE task_name = '{message_delete.text}'")
-        bot.send_message(message_delete.chat.id, """Вы успешно удалили задачу <u><b>""" + message_delete.text +"</b></u>", parse_mode='html')
+    bot.send_message(message.chat.id, "🗑 Выбери задачу под удаление 🗑")
+    bot.register_next_step_handler(message, delite_func)
+def delite_func(message):
+    current_user_nickname = message.from_user.username
+    cursor.execute(f"DELETE FROM tasks WHERE task_name = '{message.text}'")
+    bot.send_message(message.chat.id, """🗑 Вы успешно удалили задачу <u><b>""" + message.text +"</b></u> 🗑", parse_mode='html')
 
 
 @bot.message_handler(commands=['complete'])
 def complete_task(message):
     bot.send_message(message.chat.id, "Напиши название задачи, статус которой хочешь изменить.")
-    @bot.message_handler(content_types=["text"])
-    def complete(message_comp):
-        cursor.execute(f"SELECT state FROM tasks WHERE task_name = '{message_comp.text}'")
-        task_status = cursor.fetchone()[0]
-        if task_status == "В ПРОЦЕССЕ":
-            cursor.execute(f"UPDATE tasks SET state = 'ГОТОВО' WHERE task_name = '{message_comp.text}'")
-            bot.send_message(message_comp.chat.id, "Статус вашей задачи был обновлен на 'ГОТОВО'")
-        else:
-            cursor.execute(f"UPDATE tasks SET state = 'В ПРОЦЕССЕ' WHERE task_name = '{message_comp.text}'")
-            bot.send_message(message_comp.chat.id, "Статус вашей задачи был обновлен на 'В ПРОЦЕССЕ'")
+    bot.register_next_step_handler(message, complete)
+def complete(message_comp):
+    cursor.execute(f"SELECT state FROM tasks WHERE task_name = '{message_comp.text}'")
+    task_status = cursor.fetchone()[0]
+    if task_status == "В ПРОЦЕССЕ":
+        cursor.execute(f"UPDATE tasks SET state = 'ГОТОВО' WHERE task_name = '{message_comp.text}'")
+        bot.send_message(message_comp.chat.id, "Статус вашей задачи был обновлен на '✅'")
+
+    else:
+        cursor.execute(f"UPDATE tasks SET state = 'В ПРОЦЕССЕ' WHERE task_name = '{message_comp.text}'")
+        bot.send_message(message_comp.chat.id, "Статус вашей задачи был обновлен на '⌛'")
+
 
 
 
@@ -84,8 +87,12 @@ def get_user_text(message):
     current_user_nickname = message.from_user.username
     cursor.execute(f"SELECT task_name, state FROM tasks WHERE author = '{current_user_nickname}'")
     users_records = cursor.fetchall()
-    text = '\n\n'.join(['       '.join(map(str, x)) for x in users_records])
-    bot.send_message(message.chat.id, (str(text)))
+    if len(users_records) != 0:
+        text = '\n\n'.join(['       '.join(map(str, x)) for x in users_records])
+        bot.send_message(message.chat.id, (str(text)))
+    else:
+        bot.send_message(message.chat.id, "У вас нет задач.")
+
 
 
 bot.polling(none_stop=True)
